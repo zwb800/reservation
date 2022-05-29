@@ -1,41 +1,37 @@
 <template>
   <view class="content">
-    <image class="logo" src="/static/logo.png" />
-    <view class="text-area">
-      <text class="title">{{ title }}</text>
+    <view>请选择预约时间 {{selectedTime}}</view>
+    <view @click="chooseTime(h.date)" v-for="h in hours" :key="h">
+    {{h.label}}
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-const title = ref('Hello')
+
+interface Time {
+  label:string
+  date:Date
+}
+
+const selectedTime = ref(new Date())
+const hours = ref(new Array<Time>())
+
+const dateToday = new Date()
+const dateStr = dateToday.getFullYear()+"-"+dateToday.getMonth()+"-"+dateToday.getDate()
+for(let i=10;i<21;i++){
+  for(let minute = 0;minute<31;minute+=30){
+    const date = new Date( dateStr+" "+i+":"+minute)
+    hours.value.push({label:date.getHours()+":"+date.getMinutes().toString().padStart(2,'0'),date})
+  }
+  
+}
+
+const chooseTime = (date:Date)=>{
+  selectedTime.value = date
+}
 </script>
 
 <style>
-.content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.logo {
-  height: 200rpx;
-  width: 200rpx;
-  margin-top: 200rpx;
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 50rpx;
-}
-
-.text-area {
-  display: flex;
-  justify-content: center;
-}
-
-.title {
-  font-size: 36rpx;
-  color: #8f8f94;
-}
 </style>
