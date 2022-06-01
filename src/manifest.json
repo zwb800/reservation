@@ -50,11 +50,13 @@
     "quickapp" : {},
     /* 小程序特有相关 */
     "mp-weixin" : {
-        "appid" : "",
+        "appid" : "wx650331daea0a3b57",
         "setting" : {
-            "urlCheck" : false
+            "urlCheck" : false,
+            "minifyWXML": true
         },
-        "usingComponents" : true
+        "usingComponents" : true,
+        "lazyCodeLoading": "requiredComponents"
     },
     "mp-alipay" : {
         "usingComponents" : true

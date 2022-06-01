@@ -1,10 +1,10 @@
 <template>
-	<uni-notice-bar show-icon scrollable :speed="50"
-				text="预约系统上线啦，试运行期间仅支持荣庆店，预约过程中遇到问题请联系微信客服或技术支持电话:15311508135" />
+	<uni-notice-bar show-icon :speed="50"
+				text="预约系统试运行期间仅支持荣庆店，迟到15分钟将自动取消，如问题请联系微信客服或技术支持电话:15311508135" />
   <view class="content">
     <template v-if="reservation.num==0">
-      
-      <view class="flex">
+     
+      <view class="flex" v-if="hours.length>0">
         <view class="item" v-for="h,index in hours" :key="index">
         <uni-card padding="0" spacing="0">
           <view class="label gray" v-if="isOccp(h) == 0" @click="unAvailible">
@@ -25,6 +25,7 @@
         </view>
       
       </view>
+      <uni-title v-else align="center" type="h1" title="本店已打烊，请在工作时间预约"></uni-title>
     </template>
     <template v-else>
       <reservation-info :reservation="reservation"></reservation-info>
@@ -38,29 +39,33 @@
 
 <script setup lang="ts">
 
-import { onMounted, ref, watch } from 'vue'
+import { onLoad, onShow } from '@dcloudio/uni-app';
+import { ref } from 'vue'
+import { addReservation, cancelReservation, getAvailableReservation, getReservation, getReservationByOpenID } from './api';
 import { Reservation } from './reservation';
 
-const maxNum = 2
+interface ReservationView {
+  label:string,
+  time:Date,
+  num:number
+}
 
-
+let openid = ''
+let shopId = '1'
+let debug = false
 
 const showDialog = ref(false)
 const availableNum = ref(0)
-const reservation = ref<Reservation>({time:new Date(0),num:0,label:''})
+const reservation = ref<Reservation>({time:new Date(0),num:0,shopId})
 
-const hours = ref(new Array<Reservation>())
+const hours = ref(new Array<ReservationView>())
 
 const dateToday = new Date()
-const dateStr = dateToday.getFullYear()+"-"+dateToday.getMonth()+"-"+dateToday.getDate()
+const dateStr = dateToday.getFullYear()+"-"+(dateToday.getMonth()+1)+"-"+dateToday.getDate()
 
-const reservations = [
-  {time:new Date(dateStr+' 10:00'),num:1},
-  {time:new Date(dateStr+' 12:00'),num:1},
-  {time:new Date(dateStr+' 13:30'),num:2},
-]
+let reservations = new Array<Reservation>()
 
-const isOccp = (t:Reservation)=>{
+const isOccp = (t:ReservationView)=>{
   let result = t.num
   const tBegin = t.time
   const tEnd = new Date(tBegin.getTime() + 90*60*1000)
@@ -82,32 +87,70 @@ const isOccp = (t:Reservation)=>{
   return result
 }
 
-const beginHour = 10
-const endHour = 21
-const minuteStep = 30
+const maxNum = 2
 
-for(let i=beginHour;i<endHour;i++){
-  for(let minute = 0;minute<60;minute+=minuteStep){
-    const time = new Date( dateStr+" "+i+":"+minute)
-    hours.value.push({
-      label:time.getHours()+":"+time.getMinutes().toString().padStart(2,'0'),
-      time,num:maxNum})
+const loadData = async()=>{
+  if(openid == '')
+  return
+  uni.showLoading({title:'加载中',mask:true})
+  reservations = await getReservation(shopId)
+  const rResult = await getReservationByOpenID(openid)
+  if(rResult.length>0){
+    reservation.value = rResult[0]
   }
+  else
+    reservation.value = {time:new Date(0),num:0,shopId}
+
+  const result = await getAvailableReservation()
+  
+  const arr = new Array<ReservationView>()
+  const now = new Date()
+  for (const r of result) {
+    const time = new Date(dateStr+' '+r.time)
+    if(time > now || debug){
+      arr.push({time,num:r.num,label:time.getHours()+":"+time.getMinutes().toString().padStart(2,'0')})
+    }
+     
+  }
+  hours.value = arr
+  uni.hideLoading()
 }
 
-onMounted(()=>{
-  // reservation.value = 
-})
+onLoad((option)=>{
+  if(option.shopId)
+    shopId = option.shopId
+  if(option.debug)
+    debug = true
 
-const chooseTime = (t:Reservation)=>{
+   uni.getStorage({
+    key:'openid',
+    success:(res)=>{
+      if(res.data!=''){
+        openid = res.data
+        loadData()
+      }
+    },
+    fail:()=>{
+      uni.$on('openid',(o)=>{
+        
+        openid = o
+        loadData()
+      })
+    }
+  })
+})
+onShow(loadData)
+
+const chooseTime = (t:ReservationView)=>{
   reservation.value.time = t.time
   availableNum.value = isOccp(t)
   showDialog.value =true
 }
 
-const confirm = (n:number)=>{
+const confirm = async (n:number)=>{
 
   reservation.value.num = n
+  await addReservation(openid,reservation.value)
 }
 const unAvailible = ()=>{
   uni.showToast({
@@ -119,14 +162,24 @@ const unAvailible = ()=>{
 const cancel = ()=>{
   uni.showModal({
     title:'确定取消预约吗？',
-    success:(res)=>{
+    success:async (res)=>{
       if(res.confirm){
-        uni.showToast({
+        const result = await cancelReservation(openid)
+        if(result.updated>0){
+            uni.showToast({
               title:'预约已取消',
               success:()=>{
-                reservation.value.num = 0
+                loadData()
               }
             })
+        }
+        else{
+          uni.showToast({
+              title:'操作失败 ',
+              icon:'error'
+            })
+        }
+        
         
       }
     
@@ -166,3 +219,7 @@ const cancel = ()=>{
   background:$uni-text-color-grey
 }
 </style>
+
+function hook(hook: any) {
+  throw new Error('Function not implemented.');
+}
