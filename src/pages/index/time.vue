@@ -107,9 +107,9 @@ const loadData = async()=>{
   const now = new Date()
   for (const r of result) {
     const time = new Date(dateStr+' '+r.time)
-    // if(time > now || debug){
+    if(time > now || debug){
       arr.push({time,num:r.num,label:time.getHours()+":"+time.getMinutes().toString().padStart(2,'0')})
-    // }
+    }
   }
   hours.value = arr
   uni.hideLoading()
